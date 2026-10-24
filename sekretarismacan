@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manajemen Loting - CAHAYA DIGITAL SCORING</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- Library untuk Export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Library untuk Manajemen Excel (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background-color: #f8fafc; 
+            color: #1e293b; 
+            margin: 0; 
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .custom-scroll { overflow-y: auto; overflow-x: auto; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .save-notif { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: #10b981; 
+            color: white; 
+            padding: 15px 25px; 
+            border-radius: 15px; 
+            font-weight: bold; 
+            transform: translateX(200%); 
+            transition: 0.5s; 
+            z-index: 60000; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .save-notif.show { transform: translateX(0); }
+
+        .label-sekre { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; display: block; }
+        .input-loting { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-weight: 700; outline: none; background-color: white; transition: all 0.3s; }
+        .input-loting:focus { border-color: #e11d48; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.2); }
+
+        /* TAB STYLE LOTING */
+        .loting-tab-btn { flex: 1; padding: 15px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; border-bottom: 3px solid transparent; color: #94a3b8; transition: all 0.3s; text-align: center; }
+        .loting-tab-btn.active { border-bottom-color: #e11d48; color: #e11d48; background: #fff1f2; }
+
+        /* TABLE MOBILE ADJUSTMENTS */
+        th, td { white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+    <div id="save-ani" class="save-notif"><i class="fas fa-check-circle mr-2"></i> Data Tersimpan!</div>
+
+    <!-- HEADER -->
+    <div class="p-4 bg-white shadow-sm flex justify-between items-center border-b shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center text-rose-600">
+                <i class="fas fa-random"></i>
+            </div>
+            <h2 class="text-sm font-black uppercase italic text-rose-600 leading-tight">
+                Manajemen<br><span class="text-[10px] text-slate-500">Loting Peserta</span>
+            </h2>
+        </div>
+        <button onclick="clearAllParticipants()" class="bg-rose-50 border border-rose-200 text-rose-600 font-black text-[10px] px-3 py-2 rounded-xl active:scale-95 transition-all uppercase shadow-sm">
+            <i class="fas fa-trash-alt mr-1"></i> Reset Data
+        </button>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <div class="flex bg-white border-b shrink-0 shadow-sm z-10">
+        <button id="lot-tab-1" onclick="switchLotingPage(1)" class="loting-tab-btn active"><i class="fas fa-user-plus sm:mr-2 block sm:inline mb-1 sm:mb-0 text-base sm:text-sm"></i> <span class="text-[8px] sm:text-[10px] block sm:inline mt-1 sm:mt-0">Input Data</span></button>
+        <button id="lot-tab-2" onclick="switchLotingPage(2)" class="loting-tab-btn"><i class="fas fa-users sm:mr-2 block sm:inline mb-1 sm:mb-0 text-base sm:text-sm"></i> <span class="text-[8px] sm:text-[10px] block sm:inline mt-1 sm:mt-0">Data & Loting</span></button>
+        <button id="lot-tab-3" onclick="switchLotingPage(3)" class="loting-tab-btn"><i class="fas fa-calendar-alt sm:mr-2 block sm:inline mb-1 sm:mb-0 text-base sm:text-sm"></i> <span class="text-[8px] sm:text-[10px] block sm:inline mt-1 sm:mt-0">Hasil Loting</span></button>
+    </div>
+    
+    <!-- PAGE 1: INPUT DATA -->
+    <div id="lot-page-1" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 flex flex-col items-center custom-scroll">
+        <div class="w-full max-w-lg space-y-6 pb-10">
+            
+            <!-- Fitur Impor Excel Terhubung Panel Operator -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 class="text-xs font-black uppercase text-slate-700 mb-3 flex items-center gap-2"><i class="fas fa-file-excel text-green-600"></i> Impor Data via Excel</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tight italic bg-slate-50 p-2 rounded-lg border border-slate-100">* Bisa import Template Daftar Peserta biasa ATAU Template Jadwal dari Panel Operator.</p>
+                    <input type="file" id="lot-excel-input" class="hidden" accept=".xlsx, .xls" onchange="handleExcelImport(event)">
+                    <button onclick="document.getElementById('lot-excel-input').click()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-md active:scale-95 transition-all"><i class="fas fa-upload mr-2"></i> Pilih File Excel</button>
+                </div>
+            </div>
+
+            <div class="text-center py-1">
+                <div class="h-px bg-slate-300 w-full relative"><span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-50 px-4 text-[9px] font-black text-slate-400">ATAU INPUT MANUAL</span></div>
+            </div>
+
+            <!-- Form Input Manual -->
+            <div class="grid grid-cols-1 gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
+                <div class="absolute top-0 left-0 w-full h-1 bg-rose-500 rounded-t-2xl"></div>
+                
+                <!-- HIDDEN FIELD UNTUK EDIT ID -->
+                <input type="hidden" id="lot-edit-id" value="">
+                
+                <div>
+                    <label class="label-sekre uppercase">Kategori Usia *</label>
+                    <select id="lot-cat" class="input-loting uppercase">
+                        <option>USIA DINI 1</option>
+                        <option>USIA DINI 2</option>
+                        <option>PRA REMAJA</option>
+                        <option>REMAJA</option>
+                        <option>DEWASA</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="label-sekre uppercase">Kelas *</label>
+                        <select id="lot-kelas" class="input-loting uppercase">
+                            <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option><option value="K">K</option><option value="L">L</option><option value="BEBAS">BEBAS</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label-sekre uppercase">Gender *</label>
+                        <select id="lot-gender" class="input-loting uppercase">
+                            <option>PUTRA</option>
+                            <option>PUTRI</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="label-sekre uppercase">Nama Lengkap Peserta *</label>
+                    <input type="text" id="lot-nama" class="input-loting uppercase" placeholder="Masukkan Nama Pesilat">
+                </div>
+                
+                <div>
+                    <label class="label-sekre uppercase">Kontingen / Perguruan *</label>
+                    <input type="text" id="lot-nama-perguruan" class="input-loting uppercase" placeholder="Masukkan Nama Kontingen">
+                </div>
+                
+                <div>
+                    <label class="label-sekre uppercase">Upload Foto (Opsional)</label>
+                    <input type="file" id="lot-photo" class="input-loting text-[10px]" accept=".jpg,.jpeg,.png">
+                </div>
+                
+                <button id="lot-save-btn" onclick="addParticipantToLoting()" class="w-full bg-rose-600 text-white py-4 rounded-xl font-black text-[11px] uppercase shadow-lg active:scale-[0.98] transition-all mt-2">
+                    <i class="fas fa-save mr-2"></i> Daftarkan Peserta
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: DATA & LOTING -->
+    <div id="lot-page-2" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-50">
+        
+        <!-- Filter & Action Controls -->
+        <div class="bg-white p-4 border-b shadow-sm shrink-0 z-10">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-[10px] font-black uppercase text-slate-500 italic"><i class="fas fa-filter mr-1"></i> Filter Data Peserta</span>
+                <span id="loting-counter-badge" class="bg-rose-100 text-rose-700 px-3 py-1 rounded-lg font-black text-[10px] border border-rose-200">TOTAL: 0</span>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-2 mb-3">
+                <select id="lot-f-cat" onchange="applyLotingFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Semua Usia</option>
+                </select>
+                <select id="lot-f-kelas" onchange="applyLotingFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Semua Kelas</option>
+                </select>
+                <select id="lot-f-gender" onchange="applyLotingFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Gender</option>
+                </select>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <button onclick="executeLoting(false)" class="bg-slate-900 text-white py-3 rounded-lg font-black text-[9px] sm:text-[10px] uppercase shadow-md active:scale-95 flex flex-col sm:flex-row items-center justify-center gap-1">
+                    <i class="fas fa-random"></i> Loting Semua
+                </button>
+                <button onclick="executeLoting(true)" class="bg-indigo-600 text-white py-3 rounded-lg font-black text-[9px] sm:text-[10px] uppercase shadow-md active:scale-95 flex flex-col sm:flex-row items-center justify-center gap-1">
+                    <i class="fas fa-filter"></i> Loting Filter
+                </button>
+                <button onclick="clearAllParticipants()" class="bg-rose-600 text-white py-3 rounded-lg font-black text-[9px] sm:text-[10px] uppercase shadow-md active:scale-95 flex flex-col sm:flex-row items-center justify-center gap-1">
+                    <i class="fas fa-trash-alt"></i> Hapus Semua
+                </button>
+                <button onclick="exportParticipantsExcel()" class="bg-green-600 text-white py-3 rounded-lg font-black text-[9px] sm:text-[10px] uppercase shadow-md active:scale-95 flex flex-col sm:flex-row items-center justify-center gap-1">
+                    <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+                <button onclick="exportParticipantsPDF()" class="bg-amber-500 text-white py-3 rounded-lg font-black text-[9px] sm:text-[10px] uppercase shadow-md active:scale-95 flex flex-col sm:flex-row items-center justify-center gap-1">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div id="lot-table-pdf-target" class="flex-1 overflow-auto custom-scroll p-3 sm:p-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table id="loting-data-table" class="w-full text-[10px] border-collapse">
+                    <thead class="bg-slate-800 text-white uppercase sticky top-0 z-10">
+                        <tr>
+                            <th class="p-3 text-center border-r border-slate-700">No</th>
+                            <th class="p-3 text-left border-r border-slate-700">Peserta & Kontingen</th>
+                            <th class="p-3 text-center border-r border-slate-700">Kelas</th>
+                            <th class="p-3 text-center border-r border-slate-700">Usia</th>
+                            <th class="p-3 text-center border-r border-slate-700">Gender</th>
+                            <th class="p-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loting-table-body" class="font-bold uppercase text-slate-700">
+                        <!-- Data Rendered Here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- PAGINATION CONTROL LOTING -->
+        <div class="bg-white p-3 border-t border-slate-200 flex justify-between items-center shrink-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button onclick="changeLotingPage(-1)" class="bg-slate-100 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase active:scale-95 transition-all">Prev</button>
+            <div class="text-center">
+                <span id="loting-page-info" class="text-[11px] font-black text-rose-600 italic">Hal 1 / 1</span>
+            </div>
+            <button onclick="changeLotingPage(1)" class="bg-slate-100 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase active:scale-95 transition-all">Next</button>
+        </div>
+    </div>
+
+    <!-- PAGE 3: HASIL LOTING -->
+    <div id="lot-page-3" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-50">
+        <!-- Header Controls & Filters -->
+        <div class="bg-white p-4 border-b shadow-sm shrink-0 z-10">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+                <span class="text-[10px] font-black uppercase text-slate-500 italic"><i class="fas fa-list mr-1"></i> Jadwal Hasil Loting</span>
+                <div class="flex gap-2">
+                    <button onclick="exportHasilLotingExcel()" class="bg-green-600 text-white py-2 px-3 rounded-lg font-black text-[9px] uppercase shadow-md active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-file-excel"></i> Export Excel
+                    </button>
+                    <button onclick="exportHasilLotingPDF()" class="bg-rose-600 text-white py-2 px-3 rounded-lg font-black text-[9px] uppercase shadow-md active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tambahan Filter Hasil Loting -->
+            <div class="grid grid-cols-3 gap-2">
+                <select id="hasil-f-cat" onchange="applyHasilFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Semua Usia</option>
+                </select>
+                <select id="hasil-f-kelas" onchange="applyHasilFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Semua Kelas</option>
+                </select>
+                <select id="hasil-f-gender" onchange="applyHasilFilters()" class="text-[9px] sm:text-[10px] font-bold border border-slate-300 rounded-lg px-1 sm:px-2 py-2 outline-none uppercase bg-slate-50 text-slate-700">
+                    <option value="SEMUA">Gender</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Data Table Hasil -->
+        <div class="flex-1 overflow-auto custom-scroll p-3 sm:p-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-[9px] sm:text-[10px] border-collapse">
+                    <thead class="bg-slate-800 text-white uppercase sticky top-0 z-10">
+                        <tr>
+                            <th class="p-2 border border-slate-700">No</th>
+                            <th class="p-2 border border-slate-700">Partai</th>
+                            <th class="p-2 border border-slate-700">Fase</th>
+                            <th class="p-2 border border-slate-700">Kategori</th>
+                            <th class="p-2 border border-slate-700 bg-blue-600 text-white shadow-inner">Peserta (Biru)</th>
+                            <th class="p-2 border border-slate-700 bg-blue-600 text-white shadow-inner">Kontingen (Biru)</th>
+                            <th class="p-2 border border-slate-700 bg-blue-600 text-white shadow-inner">BB (Biru)</th>
+                            <th class="p-2 border border-slate-700 bg-red-600 text-white shadow-inner">Peserta (Merah)</th>
+                            <th class="p-2 border border-slate-700 bg-red-600 text-white shadow-inner">Kontingen (Merah)</th>
+                            <th class="p-2 border border-slate-700 bg-red-600 text-white shadow-inner">BB (Merah)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hasil-loting-table-body" class="font-bold uppercase text-slate-700 text-center">
+                        <!-- Data Rendered Here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- PAGINATION CONTROL HASIL LOTING -->
+        <div class="bg-white p-3 border-t border-slate-200 flex justify-between items-center shrink-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button onclick="changeHasilLotingPage(-1)" class="bg-slate-100 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase active:scale-95 transition-all">Prev</button>
+            <div class="text-center">
+                <span id="hasil-loting-page-info" class="text-[11px] font-black text-rose-600 italic">Hal 1 / 1</span>
+            </div>
+            <button onclick="changeHasilLotingPage(1)" class="bg-slate-100 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase active:scale-95 transition-all">Next</button>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Konfigurasi Firebase
+    const firebaseConfig = {
+  apiKey: "AIzaSyB_ef29_Y-kxHNVh7wPdxrtg4o5tLBdRvA",
+  authDomain: "usia-dini.firebaseapp.com",
+  databaseURL: "https://usia-dini-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "usia-dini",
+  storageBucket: "usia-dini.firebasestorage.app",
+  messagingSenderId: "954421123766",
+  appId: "1:954421123766:web:e6db6346e2403a8ba26417"
+};
+    
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const dbRef = ref(database, 'pencak_scoring_state');
+
+    // Initial State
+    const INITIAL_STATE = {
+        participants: [], 
+        matches: Array.from({length: 1000}, (_, i) => ({ 
+            p: i+1, m: "", b: "", km: "", kb: "", cat: "USIA DINI 2", kelas: "A", gender: "PUTRA", fase: "PENYISIHAN", status: 'idle', totalM: 0, totalB: 0, winner: "", winnerSide: "",
+            biruStatus: "", merahStatus: "", maxBabak: 3, maxTimer: 120, nextP: null, photoB: "", photoM: "", beratB: "", beratM: ""
+        }))
+    };
+
+    window.state = INITIAL_STATE;
+    window.lotingCurrentPage = 0;
+    window.hasilLotingCurrentPage = 0;
+    
+    window.lotingFilterCat = 'SEMUA'; 
+    window.lotingFilterKelas = 'SEMUA'; 
+    window.lotingFilterGender = 'SEMUA';
+
+    window.hasilFilterCat = 'SEMUA'; 
+    window.hasilFilterKelas = 'SEMUA'; 
+    window.hasilFilterGender = 'SEMUA';
+
+    // Sync Firebase
+    onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) { 
+            window.state = data; 
+            renderLotingTable();
+            renderHasilLotingTable();
+        } else { 
+            set(dbRef, INITIAL_STATE); 
+        }
+    });
+
+    window.broadcast = function(path = "", value = null) {
+        if (path !== "") { 
+            const specificRef = ref(database, 'pencak_scoring_state/' + path); 
+            set(specificRef, value); 
+        } else { 
+            set(dbRef, window.state); 
+        }
+    }
+
+    window.showNotif = function() { 
+        const n = document.getElementById('save-ani'); 
+        n.classList.add('show'); 
+        setTimeout(() => n.classList.remove('show'), 2000); 
+    }
+
+    window.switchLotingPage = function(pageNum) {
+        document.getElementById('lot-page-1').classList.toggle('hidden', pageNum !== 1);
+        document.getElementById('lot-page-2').classList.toggle('hidden', pageNum !== 2);
+        document.getElementById('lot-page-3').classList.toggle('hidden', pageNum !== 3);
+        
+        document.getElementById('lot-tab-1').classList.toggle('active', pageNum === 1);
+        document.getElementById('lot-tab-2').classList.toggle('active', pageNum === 2);
+        document.getElementById('lot-tab-3').classList.toggle('active', pageNum === 3);
+        
+        if(pageNum === 2) renderLotingTable();
+        if(pageNum === 3) renderHasilLotingTable();
+    }
+
+    window.addParticipantToLoting = function() {
+        const editId = document.getElementById('lot-edit-id').value;
+        const cat = document.getElementById('lot-cat').value.toString().trim().toUpperCase();
+        const kelas = document.getElementById('lot-kelas').value.toString().trim().toUpperCase();
+        const gender = document.getElementById('lot-gender').value.toString().trim().toUpperCase();
+        const nama = document.getElementById('lot-nama').value.toUpperCase();
+        const kont = document.getElementById('lot-nama-perguruan').value.toUpperCase();
+        const rCount = 3; 
+        const timer = 120;
+        const photoInput = document.getElementById('lot-photo');
+        
+        if(!nama || !kelas || !kont) { 
+            alert("Mohon lengkapi data yang bertanda bintang (*)"); 
+            return; 
+        }
+
+        const processSave = (photoUrl = "") => {
+            let current = window.state.participants || [];
+            if(editId) {
+                const idx = current.findIndex(p => p.id == editId);
+                if(idx > -1) {
+                    const oldPhoto = current[idx].photo;
+                    current[idx] = { ...current[idx], cat, kelas, gender, nama, kont, photo: photoUrl || oldPhoto };
+                }
+            } else {
+                current.push({ id: Date.now(), cat, kelas, gender, nama, kont, photo: photoUrl, round: rCount, timer: timer });
+            }
+            window.broadcast('participants', current);
+            
+            // RESET FORM
+            document.getElementById('lot-edit-id').value = "";
+            document.getElementById('lot-nama').value = "";
+            document.getElementById('lot-nama-perguruan').value = "";
+            document.getElementById('lot-photo').value = "";
+            document.getElementById('lot-save-btn').innerHTML = `<i class="fas fa-save mr-2"></i> Daftarkan Peserta`;
+            
+            showNotif();
+            setTimeout(() => { switchLotingPage(2); }, 500);
+        }
+
+        if(photoInput.files && photoInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => processSave(e.target.result);
+            reader.readAsDataURL(photoInput.files[0]);
+        } else { processSave(""); }
+    }
+
+    window.editParticipantLoting = function(id) {
+        const p = window.state.participants.find(x => x.id == id);
+        if(p) {
+            document.getElementById('lot-edit-id').value = p.id;
+            document.getElementById('lot-cat').value = p.cat;
+            document.getElementById('lot-kelas').value = p.kelas;
+            document.getElementById('lot-gender').value = p.gender;
+            document.getElementById('lot-nama').value = p.nama;
+            document.getElementById('lot-nama-perguruan').value = p.kont;
+            document.getElementById('lot-save-btn').innerHTML = `<i class="fas fa-edit mr-2"></i> Update Peserta`;
+            switchLotingPage(1);
+        }
+    }
+
+    window.deleteParticipantLoting = function(id) { 
+        if(confirm("Yakin ingin menghapus peserta ini?")) { 
+            window.broadcast('participants', window.state.participants.filter(p => p.id !== id)); 
+            renderLotingTable(); 
+        } 
+    }
+
+    window.clearAllParticipants = function() { 
+        if(confirm("Peringatan: Hapus SEMUA peserta dari daftar? Aksi tidak dapat dibatalkan.")) {
+            window.broadcast('participants', []); 
+            renderLotingTable();
+        } 
+    }
+
+    window.handleExcelImport = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const notif = document.getElementById('save-ani');
+        notif.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Mengimpor Data...';
+        notif.classList.add('show');
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, {defval: ""});
+                
+                const currentParticipants = window.state.participants || [];
+                let importCount = 0;
+                
+                jsonData.forEach(row => {
+                    const keys = Object.keys(row);
+                    const getVal = (possibleNames) => {
+                        for(let k of keys) {
+                            if(possibleNames.some(pn => k.toUpperCase().includes(pn))) return row[k].toString().trim();
+                        }
+                        return "";
+                    };
+
+                    let namaBiru = getVal(["NAMA PESERTA (BIRU)", "NAMA BIRU"]);
+                    let namaMerah = getVal(["NAMA PESERTA (MERAH)", "NAMA MERAH"]);
+                    let katFormat = getVal(["KATEGORI"]);
+
+                    if(katFormat && (namaBiru || namaMerah)) {
+                        let kParts = katFormat.split(" ");
+                        let kelas = (kParts[0] || "A").toString().trim().toUpperCase();
+                        let gender = (katFormat.toUpperCase().includes("PUTRI") || katFormat.toUpperCase().includes("PI")) ? "PUTRI" : "PUTRA";
+                        let cat = (kParts.slice(1).join(" ").replace(/(PUTRA|PUTRI|PI|PA)/ig, '').trim() || "DEWASA").toUpperCase();
+
+                        if(namaBiru && namaBiru !== "BYE" && !namaBiru.includes("PEMENANG")) {
+                            currentParticipants.push({
+                                id: Date.now() + Math.random(),
+                                cat: cat, kelas: kelas, gender: gender,
+                                nama: namaBiru.toUpperCase(),
+                                kont: (getVal(["KONTINGEN (BIRU)", "KONTINGEN BIRU"]) || "-").toUpperCase(),
+                                photo: "", round: 3, timer: 120
+                            });
+                            importCount++;
+                        }
+                        if(namaMerah && namaMerah !== "BYE" && !namaMerah.includes("PEMENANG")) {
+                            currentParticipants.push({
+                                id: Date.now() + Math.random(),
+                                cat: cat, kelas: kelas, gender: gender,
+                                nama: namaMerah.toUpperCase(),
+                                kont: (getVal(["KONTINGEN (MERAH)", "KONTINGEN MERAH"]) || "-").toUpperCase(),
+                                photo: "", round: 3, timer: 120
+                            });
+                            importCount++;
+                        }
+                    } else {
+                        const nama = getVal(["NAMA", "PESERTA"]).toUpperCase();
+                        const kont = getVal(["KONTINGEN", "PERGURUAN", "ASAL"]).toUpperCase();
+                        const kelas = getVal(["KELAS"]).toString().trim().toUpperCase();
+                        const cat = (getVal(["KATEGORI", "USIA"]) || "DEWASA").toString().trim().toUpperCase();
+                        const gender = (getVal(["GENDER", "JENIS KELAMIN", "KELAMIN"]) || "PUTRA").toString().trim().toUpperCase();
+
+                        if (nama && kont && kelas) {
+                            currentParticipants.push({
+                                id: Date.now() + Math.random(),
+                                cat: cat, kelas: kelas, gender: gender,
+                                nama: nama, kont: kont, photo: "", round: 3, timer: 120
+                            });
+                            importCount++;
+                        }
+                    }
+                });
+
+                if (importCount > 0) {
+                    window.broadcast('participants', currentParticipants);
+                    notif.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ${importCount} Data Diimpor!`;
+                    setTimeout(() => notif.classList.remove('show'), 2000);
+                    switchLotingPage(2);
+                } else {
+                    notif.classList.remove('show');
+                    alert("Tidak ada data yang valid. Pastikan header kolom sesuai Format Operator atau Format Peserta.");
+                }
+            } catch (error) {
+                console.error(error);
+                notif.classList.remove('show');
+                alert("Gagal membaca file Excel. File mungkin rusak atau tidak didukung.");
+            }
+            event.target.value = ""; 
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    window.exportParticipantsExcel = function() {
+        const list = window.state.participants || [];
+        if(list.length === 0) { alert("Tidak ada data untuk diexport"); return; }
+        
+        const sortedList = [...list].sort((a, b) => {
+            if(a.kelas !== b.kelas) return a.kelas.localeCompare(b.kelas);
+            return a.gender.localeCompare(b.gender);
+        });
+
+        const data = sortedList.map((p, idx) => ({
+            "NO": idx + 1,
+            "NAMA PESERTA": p.nama,
+            "KONTINGEN": p.kont,
+            "KATEGORI USIA": p.cat,
+            "KELAS": p.kelas,
+            "GENDER": p.gender
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(data);
+        const colWidths = [{ wch: 5 }, { wch: 30 }, { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }];
+        ws['!cols'] = colWidths;
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Daftar_Peserta");
+        XLSX.writeFile(wb, "Data_Peserta_Loting.xlsx");
+    }
+
+    window.exportParticipantsPDF = function() {
+        const list = window.state.participants || [];
+        if(list.length === 0) {
+            alert("Tidak ada data peserta.");
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.style.padding = '20px';
+        container.style.backgroundColor = '#ffffff';
+        container.style.color = '#000000';
+        container.style.fontFamily = 'Montserrat, sans-serif';
+        
+        let html = `
+            <h2 style="text-align: center; font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 15px;">DAFTAR PESERTA PERTANDINGAN</h2>
+            <table style="width: 100%; border-collapse: collapse; font-size: 9px; text-align: center; border: 1px solid #000;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #000; padding: 6px; background: #f1f5f9;">NO</th>
+                        <th style="border: 1px solid #000; padding: 6px; background: #3b82f6; color: #fff;">NAMA PESERTA</th>
+                        <th style="border: 1px solid #000; padding: 6px; background: #3b82f6; color: #fff;">KONTINGEN</th>
+                        <th style="border: 1px solid #000; padding: 6px; background: #f1f5f9;">KATEGORI USIA</th>
+                        <th style="border: 1px solid #000; padding: 6px; background: #f1f5f9;">KELAS</th>
+                        <th style="border: 1px solid #000; padding: 6px; background: #f1f5f9;">GENDER</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        const sortedList = [...list].sort((a, b) => {
+            if(a.kelas !== b.kelas) return a.kelas.localeCompare(b.kelas);
+            return a.gender.localeCompare(b.gender);
+        });
+
+        sortedList.forEach((p, i) => {
+            html += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px;">${i + 1}</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #eff6ff; color: #1e40af; text-align: left;">${p.nama}</td>
+                    <td style="border: 1px solid #000; padding: 6px; background-color: #eff6ff; color: #1e40af; text-align: left;">${p.kont}</td>
+                    <td style="border: 1px solid #000; padding: 6px;">${p.cat}</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${p.kelas}</td>
+                    <td style="border: 1px solid #000; padding: 6px;">${p.gender}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+
+        const opt = { 
+            margin: 10, 
+            filename: 'Daftar_Peserta_Pertandingan.pdf', 
+            image: { type: 'jpeg', quality: 1 }, 
+            html2canvas: { scale: 2 }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+        };
+        html2pdf().set(opt).from(container).save();
+    }
+
+    // --- HELPER FUNCTION: GET FILTERED HASIL LOTING ---
+    window.getFilteredHasil = function() {
+        let list = window.state.matches.filter(m => m.m || m.b);
+        return list.filter(m => 
+            (window.hasilFilterCat === 'SEMUA' || m.cat === window.hasilFilterCat) && 
+            (window.hasilFilterKelas === 'SEMUA' || m.kelas === window.hasilFilterKelas) && 
+            (window.hasilFilterGender === 'SEMUA' || m.gender === window.hasilFilterGender)
+        );
+    }
+
+    // --- TAB HASIL LOTING ---
+    window.applyHasilFilters = function() {
+        window.hasilFilterCat = document.getElementById('hasil-f-cat').value;
+        window.hasilFilterKelas = document.getElementById('hasil-f-kelas').value;
+        window.hasilFilterGender = document.getElementById('hasil-f-gender').value;
+        window.hasilLotingCurrentPage = 0;
+        renderHasilLotingTable();
+    }
+
+    window.renderHasilLotingTable = function() {
+        const body = document.getElementById('hasil-loting-table-body');
+        if(!body) return;
+        
+        let fullList = window.state.matches.filter(m => m.m || m.b);
+        
+        // Memastikan seluruh dropdown Filter Hasil Loting terisi dinamis
+        const uniqueCat = [...new Set(fullList.map(m => m.cat || ''))].filter(Boolean).sort();
+        const uniqueKelas = [...new Set(fullList.map(m => m.kelas || ''))].filter(Boolean).sort();
+        const uniqueGender = [...new Set(fullList.map(m => m.gender || ''))].filter(Boolean).sort();
+
+        const selectCatHasil = document.getElementById('hasil-f-cat');
+        if(selectCatHasil) {
+            const currentVal = selectCatHasil.value;
+            const optionsHtml = '<option value="SEMUA">Semua Usia</option>' + uniqueCat.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectCatHasil.innerHTML = optionsHtml;
+            if(uniqueCat.includes(currentVal)) selectCatHasil.value = currentVal;
+            else { selectCatHasil.value = "SEMUA"; window.hasilFilterCat = "SEMUA"; }
+        }
+
+        const selectKelasHasil = document.getElementById('hasil-f-kelas');
+        if(selectKelasHasil) {
+            const currentVal = selectKelasHasil.value;
+            const optionsHtml = '<option value="SEMUA">Semua Kelas</option>' + uniqueKelas.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectKelasHasil.innerHTML = optionsHtml;
+            if(uniqueKelas.includes(currentVal)) selectKelasHasil.value = currentVal;
+            else { selectKelasHasil.value = "SEMUA"; window.hasilFilterKelas = "SEMUA"; }
+        }
+
+        const selectGenderHasil = document.getElementById('hasil-f-gender');
+        if(selectGenderHasil) {
+            const currentVal = selectGenderHasil.value;
+            const optionsHtml = '<option value="SEMUA">Gender</option>' + uniqueGender.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectGenderHasil.innerHTML = optionsHtml;
+            if(uniqueGender.includes(currentVal)) selectGenderHasil.value = currentVal;
+            else { selectGenderHasil.value = "SEMUA"; window.hasilFilterGender = "SEMUA"; }
+        }
+        
+        const list = getFilteredHasil();
+        const rowsPerPage = 20;
+        const totalPages = Math.max(1, Math.ceil(list.length / rowsPerPage));
+        if(window.hasilLotingCurrentPage >= totalPages) window.hasilLotingCurrentPage = totalPages - 1;
+        
+        const start = window.hasilLotingCurrentPage * rowsPerPage;
+        const paginated = list.slice(start, start + rowsPerPage);
+        
+        document.getElementById('hasil-loting-page-info').innerText = `Hal ${window.hasilLotingCurrentPage + 1} / ${totalPages}`;
+
+        if(paginated.length === 0) { 
+            body.innerHTML = `<tr><td colspan="10" class="p-10 text-center text-slate-400 italic uppercase">Belum ada hasil loting sesuai filter</td></tr>`; 
+        } else {
+            body.innerHTML = paginated.map((m, i) => {
+                const kategoriText = `${m.kelas} ${m.cat} ${m.gender}`;
+                return `
+                <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                    <td class="p-2 border-r border-slate-200">${start + i + 1}</td>
+                    <td class="p-2 border-r border-slate-200 font-black text-rose-600">PARTAI ${m.p}</td>
+                    <td class="p-2 border-r border-slate-200">${m.fase}</td>
+                    <td class="p-2 border-r border-slate-200">${kategoriText}</td>
+                    <td class="p-2 border-r border-slate-200 bg-blue-50 text-blue-700 font-bold">${m.b}</td>
+                    <td class="p-2 border-r border-slate-200 bg-blue-50 text-blue-700 text-[8px]">${m.kb}</td>
+                    <td class="p-2 border-r border-slate-200 bg-blue-50 text-blue-700">${m.beratB || '-'}</td>
+                    <td class="p-2 border-r border-slate-200 bg-red-50 text-red-700 font-bold">${m.m}</td>
+                    <td class="p-2 border-r border-slate-200 bg-red-50 text-red-700 text-[8px]">${m.km}</td>
+                    <td class="p-2 bg-red-50 text-red-700">${m.beratM || '-'}</td>
+                </tr>`
+            }).join('');
+        }
+    }
+
+    window.changeHasilLotingPage = function(v) {
+        const list = getFilteredHasil();
+        const totalPages = Math.max(1, Math.ceil(list.length / 20));
+        let next = window.hasilLotingCurrentPage + v;
+        if(next >= 0 && next < totalPages) {
+            window.hasilLotingCurrentPage = next;
+            renderHasilLotingTable();
+        }
+    }
+
+    window.exportHasilLotingExcel = function() {
+        const list = getFilteredHasil();
+        if(list.length === 0) {
+            alert("Belum ada jadwal / hasil loting untuk diexport.");
+            return;
+        }
+
+        const data = list.map((m, i) => ({
+            "NO": i + 1,
+            "PARTAI": m.p,
+            "FASE": m.fase,
+            "KATEGORI": `${m.kelas} ${m.cat} ${m.gender}`,
+            "NAMA PESERTA (BIRU)": m.b,
+            "KONTINGEN (BIRU)": m.kb,
+            "BB (BIRU)": m.beratB || "",
+            "NAMA PESERTA (MERAH)": m.m,
+            "KONTINGEN (MERAH)": m.km,
+            "BB (MERAH)": m.beratM || ""
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const colWidths = [
+            { wch: 5 }, { wch: 8 }, { wch: 15 }, { wch: 20 },
+            { wch: 25 }, { wch: 20 }, { wch: 10 },
+            { wch: 25 }, { wch: 20 }, { wch: 10 }
+        ];
+        ws['!cols'] = colWidths;
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Jadwal_Partai");
+        XLSX.writeFile(wb, "Jadwal_Hasil_Loting.xlsx");
+    }
+
+    window.exportHasilLotingPDF = function() {
+        const list = getFilteredHasil();
+        if(list.length === 0) {
+            alert("Belum ada hasil loting / jadwal pertandingan.");
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.style.padding = '20px';
+        container.style.backgroundColor = '#ffffff';
+        container.style.color = '#000000';
+        container.style.fontFamily = 'Montserrat, sans-serif';
+        
+        let html = `
+            <h2 style="text-align: center; font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 15px;">HASIL LOTING & JADWAL PERTANDINGAN</h2>
+            <table style="width: 100%; border-collapse: collapse; font-size: 8px; text-align: center; border: 1px solid #000;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #000; padding: 5px; background: #f1f5f9;">NO</th>
+                        <th style="border: 1px solid #000; padding: 5px; background: #f1f5f9;">PARTAI</th>
+                        <th style="border: 1px solid #000; padding: 5px; background: #f1f5f9;">FASE</th>
+                        <th style="border: 1px solid #000; padding: 5px; background: #f1f5f9;">KATEGORI</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #3b82f6; color: #fff;">NAMA PESERTA (BIRU)</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #3b82f6; color: #fff;">KONTINGEN (BIRU)</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #3b82f6; color: #fff;">BB (BIRU)</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #ef4444; color: #fff;">NAMA PESERTA (MERAH)</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #ef4444; color: #fff;">KONTINGEN (MERAH)</th>
+                        <th style="border: 1px solid #000; padding: 5px; background-color: #ef4444; color: #fff;">BB (MERAH)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        list.forEach((m, i) => {
+            const beratB = m.beratB ? `${m.beratB} Kg` : '';
+            const beratM = m.beratM ? `${m.beratM} Kg` : '';
+            const kategoriText = `${m.kelas} ${m.cat} ${m.gender}`;
+            html += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px;">${i + 1}</td>
+                    <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">${m.p}</td>
+                    <td style="border: 1px solid #000; padding: 5px;">${m.fase}</td>
+                    <td style="border: 1px solid #000; padding: 5px;">${kategoriText}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #eff6ff; color: #1e40af; font-weight: bold;">${m.b}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #eff6ff; color: #1e40af;">${m.kb}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #eff6ff; color: #1e40af;">${beratB}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #fef2f2; color: #991b1b; font-weight: bold;">${m.m}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #fef2f2; color: #991b1b;">${m.km}</td>
+                    <td style="border: 1px solid #000; padding: 5px; background-color: #fef2f2; color: #991b1b;">${beratM}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+
+        const opt = { 
+            margin: 10, 
+            filename: 'Jadwal_Hasil_Loting.pdf', 
+            image: { type: 'jpeg', quality: 1 }, 
+            html2canvas: { scale: 2 }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+        };
+        html2pdf().set(opt).from(container).save();
+    }
+
+    // --- FILTER ---
+    window.applyLotingFilters = function() {
+        window.lotingFilterCat = document.getElementById('lot-f-cat').value;
+        window.lotingFilterKelas = document.getElementById('lot-f-kelas').value;
+        window.lotingFilterGender = document.getElementById('lot-f-gender').value;
+        window.lotingCurrentPage = 0;
+        renderLotingTable();
+    }
+    
+    window.changeLotingPage = function(v) {
+        const list = window.state.participants || [];
+        const filtered = list.filter(p => 
+            (window.lotingFilterCat === 'SEMUA' || p.cat === window.lotingFilterCat) && 
+            (window.lotingFilterKelas === 'SEMUA' || p.kelas === window.lotingFilterKelas) && 
+            (window.lotingFilterGender === 'SEMUA' || p.gender === window.lotingFilterGender)
+        );
+        const totalPages = Math.max(1, Math.ceil(filtered.length / 20));
+        let next = window.lotingCurrentPage + v;
+        if(next >= 0 && next < totalPages) {
+            window.lotingCurrentPage = next;
+            renderLotingTable();
+        }
+    }
+
+    window.renderLotingTable = function() {
+        const body = document.getElementById('loting-table-body');
+        if(!body) return;
+        const list = window.state.participants || [];
+        
+        // Memastikan seluruh dropdown Filter Data Peserta terisi secara dinamis
+        const uniqueCat = [...new Set(list.map(p => p.cat || ''))].filter(Boolean).sort();
+        const uniqueKelas = [...new Set(list.map(p => p.kelas || ''))].filter(Boolean).sort();
+        const uniqueGender = [...new Set(list.map(p => p.gender || ''))].filter(Boolean).sort();
+
+        const selectCatLot = document.getElementById('lot-f-cat');
+        if(selectCatLot) {
+            const currentVal = selectCatLot.value;
+            const optionsHtml = '<option value="SEMUA">Semua Usia</option>' + uniqueCat.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectCatLot.innerHTML = optionsHtml;
+            if(uniqueCat.includes(currentVal)) selectCatLot.value = currentVal;
+            else { selectCatLot.value = "SEMUA"; window.lotingFilterCat = "SEMUA"; }
+        }
+
+        const selectKelasLot = document.getElementById('lot-f-kelas');
+        if(selectKelasLot) {
+            const currentVal = selectKelasLot.value;
+            const optionsHtml = '<option value="SEMUA">Semua Kelas</option>' + uniqueKelas.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectKelasLot.innerHTML = optionsHtml;
+            if(uniqueKelas.includes(currentVal)) selectKelasLot.value = currentVal;
+            else { selectKelasLot.value = "SEMUA"; window.lotingFilterKelas = "SEMUA"; }
+        }
+
+        const selectGenderLot = document.getElementById('lot-f-gender');
+        if(selectGenderLot) {
+            const currentVal = selectGenderLot.value;
+            const optionsHtml = '<option value="SEMUA">Gender</option>' + uniqueGender.map(k => `<option value="${k}">${k}</option>`).join('');
+            selectGenderLot.innerHTML = optionsHtml;
+            if(uniqueGender.includes(currentVal)) selectGenderLot.value = currentVal;
+            else { selectGenderLot.value = "SEMUA"; window.lotingFilterGender = "SEMUA"; }
+        }
+
+        const filtered = list.filter(p => 
+            (window.lotingFilterCat === 'SEMUA' || p.cat === window.lotingFilterCat) && 
+            (window.lotingFilterKelas === 'SEMUA' || p.kelas === window.lotingFilterKelas) && 
+            (window.lotingFilterGender === 'SEMUA' || p.gender === window.lotingFilterGender)
+        );
+        
+        document.getElementById('loting-counter-badge').innerText = `TOTAL: ${filtered.length}`;
+        
+        const rowsPerPage = 20;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
+        if(window.lotingCurrentPage >= totalPages) window.lotingCurrentPage = totalPages - 1;
+        
+        const start = window.lotingCurrentPage * rowsPerPage;
+        const paginated = filtered.slice(start, start + rowsPerPage);
+        
+        document.getElementById('loting-page-info').innerText = `Hal ${window.lotingCurrentPage + 1} / ${totalPages}`;
+
+        if(paginated.length === 0) { 
+            body.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400 italic uppercase">Tidak ada data ditemukan</td></tr>`; 
+        } else {
+            body.innerHTML = paginated.map((p, i) => {
+                const photoIcon = p.photo ? `<img src="${p.photo}" class="w-8 h-8 rounded-full inline-block mr-2 object-cover border border-slate-200">` : `<div class="w-8 h-8 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center mr-2 inline-flex"><i class="fas fa-user"></i></div>`;
+                return `
+                <tr class="border-b border-slate-200 hover:bg-rose-50/50 transition-colors">
+                    <td class="p-3 text-center text-xs font-black border-r border-slate-200 bg-slate-50/50">${start + i + 1}</td>
+                    <td class="p-3 border-r border-slate-200">
+                        <div class="flex items-center">
+                            ${photoIcon}
+                            <div class="overflow-hidden">
+                                <div class="text-[11px] font-black text-slate-800 uppercase truncate">${p.nama}</div>
+                                <div class="text-[9px] text-rose-600 font-bold tracking-tight uppercase truncate">${p.kont}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-3 text-center uppercase font-black text-slate-700 border-r border-slate-200 text-xs">${p.kelas}</td>
+                    <td class="p-3 text-center uppercase border-r border-slate-200">
+                        <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[9px] font-black">${p.cat}</span>
+                    </td>
+                    <td class="p-3 text-center uppercase font-bold text-slate-500 text-[10px] border-r border-slate-200">${p.gender}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-3">
+                            <button onclick="editParticipantLoting(${p.id})" class="text-blue-500 hover:text-blue-700 active:scale-90 text-sm"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteParticipantLoting(${p.id})" class="text-rose-500 hover:text-rose-700 active:scale-90 text-sm"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                </tr>`
+            }).join('');
+        }
+    }
+
+    // --- ALGORITMA LOTING: BERPASANGAN LANGSUNG & GUGUR TUNGGAL --- 
+    window.executeLoting = function(useFilter = false) {
+        let list = window.state.participants || [];
+        
+        if (useFilter) {
+            list = list.filter(p => 
+                (window.lotingFilterCat === 'SEMUA' || p.cat === window.lotingFilterCat) && 
+                (window.lotingFilterKelas === 'SEMUA' || p.kelas === window.lotingFilterKelas) && 
+                (window.lotingFilterGender === 'SEMUA' || p.gender === window.lotingFilterGender)
+            );
+            if(list.length < 1) { 
+                alert("Tidak ada peserta pada filter saat ini."); 
+                return; 
+            }
+            if(!confirm("Peringatan: Jadwal bagan sebelumnya akan tetap disimpan. Loting ini HANYA akan membuat bagan/jadwal baru untuk kategori yang difilter. Lanjutkan?")) return;
+        } else {
+            if(list.length < 1) { 
+                alert("Harus ada peserta yang terdaftar untuk melakukan loting."); 
+                return; 
+            }
+            if(!confirm("Peringatan: Loting akan mereset jadwal yang sudah ada dan membuat bagan baru untuk SEMUA data peserta. Lanjutkan?")) return;
+        }
+        
+        let existingMatches = window.state.matches.filter(m => m.m || m.b);
+        let groupsToRegenerate = new Set();
+        list.forEach(p => groupsToRegenerate.add(`${p.cat}|${p.kelas}|${p.gender}`));
+
+        if (useFilter) {
+            existingMatches = existingMatches.filter(m => !groupsToRegenerate.has(`${m.cat}|${m.kelas}|${m.gender}`));
+        } else {
+            existingMatches = []; 
+        }
+
+        const groups = {};
+        list.forEach(p => { 
+            const key = `${p.cat}|${p.kelas}|${p.gender}`; 
+            if(!groups[key]) groups[key] = []; 
+            groups[key].push(p); 
+        });
+        
+        const sortedGroupKeys = Object.keys(groups).sort((a,b) => groups[b].length - groups[a].length);
+        
+        let generatedMatches = [];
+        let tempPIdx = 10000; 
+        
+        for(const k of sortedGroupKeys) {
+            let pool = [...groups[k]];
+            
+            // Acak (Shuffle) posisi peserta
+            for (let i = pool.length - 1; i > 0; i--) { 
+                const j = Math.floor(Math.random() * (i + 1)); 
+                [pool[i], pool[j]] = [pool[j], pool[i]]; 
+            }
+            
+            let catParties = [];
+            let currentNodes = pool.map(p => ({ type: 'player', data: p }));
+
+            while (currentNodes.length > 1) {
+                let nextNodes = [];
+                let matchCount = Math.floor(currentNodes.length / 2);
+                let hasBye = currentNodes.length % 2 !== 0; 
+
+                // Pasangkan nodes 1 per 1
+                for (let i = 0; i < matchCount; i++) {
+                    let n1 = currentNodes[i * 2];
+                    let n2 = currentNodes[i * 2 + 1];
+
+                    const m = {...INITIAL_STATE.matches[0]};
+                    const info = groups[k][0];
+                    m.cat = info.cat; 
+                    m.kelas = info.kelas; 
+                    m.gender = info.gender; 
+                    m.maxBabak = info.round || 3; 
+                    m.maxTimer = info.timer || 120;
+                    m.p = tempPIdx++;
+
+                    // Konfigurasi Sudut Biru
+                    if (n1.type === 'player') {
+                        m.b = n1.data.nama; m.kb = n1.data.kont; m.photoB = n1.data.photo;
+                    } else {
+                        let prevMatch = catParties.find(x => x.p === n1.matchId);
+                        m.b = "PEMENANG PARTAI " + n1.matchId;
+                        m.kb = "---";
+                        m.photoB = "";
+                        if (prevMatch) prevMatch.nextP = { p: m.p, side: 'biru' };
+                    }
+
+                    // Konfigurasi Sudut Merah
+                    if (n2.type === 'player') {
+                        m.m = n2.data.nama; m.km = n2.data.kont; m.photoM = n2.data.photo;
+                    } else {
+                        let prevMatch = catParties.find(x => x.p === n2.matchId);
+                        m.m = "PEMENANG PARTAI " + n2.matchId;
+                        m.km = "---";
+                        m.photoM = "";
+                        if (prevMatch) prevMatch.nextP = { p: m.p, side: 'merah' };
+                    }
+                    
+                    catParties.push(m);
+                    nextNodes.push({ type: 'match', matchId: m.p });
+                }
+
+                // Sisa 1 peserta/tim yang ganjil (BYE)
+                // TIDAK dibuatkan partai dummy.
+                // Langsung dipindahkan ke nextNodes.
+                if (hasBye) {
+                    let oddNode = currentNodes[currentNodes.length - 1];
+                    // Disisipkan di posisi indeks 1 agar bertemu dan melawan langsung Pemenang Partai awal
+                    if (nextNodes.length > 0) {
+                        nextNodes.splice(1, 0, oddNode);
+                    } else {
+                        nextNodes.push(oddNode);
+                    }
+                }
+
+                currentNodes = nextNodes;
+            }
+
+            // Penentuan Fase dengan menyusuri relasi dari Final (Root Node)
+            if (catParties.length > 0) {
+                let finalMatch = catParties[catParties.length - 1]; 
+                finalMatch.fase = "FINAL";
+                finalMatch.distance = 0;
+
+                let queue = [finalMatch];
+                while (queue.length > 0) {
+                    let curr = queue.shift();
+                    
+                    let children = catParties.filter(x => x.nextP && x.nextP.p === curr.p);
+                    for (let child of children) {
+                        child.distance = curr.distance + 1;
+                        if (child.distance === 1) child.fase = "SEMI FINAL";
+                        else if (child.distance === 2) child.fase = "PEREMPAT FINAL";
+                        else child.fase = "PENYISIHAN";
+                        
+                        queue.push(child);
+                    }
+                }
+            }
+            
+            generatedMatches.push(...catParties);
+        }
+        
+        // 1. GABUNGKAN MATCH LAMA + BARU
+        let allMatches = [...existingMatches, ...generatedMatches];
+        
+        // Hitung total peserta pada semua kategori di dalam AllMatches
+        const catCount = {};
+        window.state.participants.forEach(p => {
+            let key = `${p.cat}|${p.kelas}|${p.gender}`;
+            catCount[key] = (catCount[key] || 0) + 1;
+        });
+
+        // 2. SORTIR KESELURUHAN JADWAL
+        const phaseWeight = { "PENYISIHAN": 1, "PEREMPAT FINAL": 2, "SEMI FINAL": 3, "FINAL": 4 };
+        allMatches.forEach((m, idx) => m.originalOrder = idx);
+
+        allMatches.sort((a, b) => {
+            let wA = phaseWeight[a.fase] || 0;
+            let wB = phaseWeight[b.fase] || 0;
+            if (wA !== wB) return wA - wB; // Prioritas 1: Kumpulkan seluruh Fase yang sama agar Final bersama
+            
+            let keyA = `${a.cat}|${a.kelas}|${a.gender}`;
+            let keyB = `${b.cat}|${b.kelas}|${b.gender}`;
+            
+            let countA = catCount[keyA] || 0;
+            let countB = catCount[keyB] || 0;
+            
+            if (countA !== countB) return countB - countA; // Prioritas 2: Kategori dengan Peserta Terbanyak
+            if (keyA !== keyB) return keyA.localeCompare(keyB); // Prioritas 3: Pengelompokkan Kategori Identik
+            
+            return a.originalOrder - b.originalOrder; // Prioritas 4: Pertahankan alur bagan
+        });
+        
+        // 3. PEMETAAN ULANG PARTAI (P)
+        let pMap = {};
+        allMatches.forEach((m, index) => {
+            pMap[m.p] = index + 1;
+            m.new_p = index + 1;
+        });
+        
+        // Update referensi String dan Objek Partai
+        allMatches.forEach(m => {
+            if (m.nextP && m.nextP.p) {
+                m.nextP.p = pMap[m.nextP.p];
+            }
+            if (m.b && m.b.startsWith("PEMENANG PARTAI ")) {
+                let oldPartai = parseInt(m.b.replace("PEMENANG PARTAI ", ""));
+                if(pMap[oldPartai]) m.b = "PEMENANG PARTAI " + pMap[oldPartai];
+            }
+            if (m.m && m.m.startsWith("PEMENANG PARTAI ")) {
+                let oldPartai = parseInt(m.m.replace("PEMENANG PARTAI ", ""));
+                if(pMap[oldPartai]) m.m = "PEMENANG PARTAI " + pMap[oldPartai];
+            }
+            m.p = m.new_p;
+            delete m.new_p;
+            delete m.originalOrder;
+        });
+        
+        // Inject kembali ke Array Utama 1000 partai
+        const updatedMatches = INITIAL_STATE.matches.map(m => ({...m}));
+        for(let i=0; i<updatedMatches.length; i++) {
+            if(i < allMatches.length) {
+                updatedMatches[i] = allMatches[i];
+            } else {
+                updatedMatches[i] = {...INITIAL_STATE.matches[i]};
+                updatedMatches[i].p = i + 1;
+            }
+        }
+        
+        window.broadcast('matches', updatedMatches);
+        alert("Loting Berhasil! Anda akan dialihkan ke Tab Hasil Loting."); 
+        switchLotingPage(3);
+    }
+
+</script>
+</body>
+</html>
